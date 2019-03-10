@@ -13,14 +13,6 @@ ALMOST_WHITE = Color(240, 240, 240, 255)
 GREEN = Color(0, 255, 0, 255)
 BLUE = Color(0, 0, 255, 255)
 RED = Color(255, 0, 0, 255)
-COLOR_MAP = (WHITE, GREEN, ALMOST_WHITE, BLACK, ALMOST_BLACK)
 MAX_ITERATIONS = 200000000000
 STARTING_STATE = 0
 SPEED = 6000
-RULES = [
-    ['rule_1'],
-    ['rule_0', 'rule_2'],
-    ['rule_3'],
-    ['rule_1'],
-    ['rule_4'],
-]

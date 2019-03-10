@@ -2,7 +2,7 @@ import sys
 from random import randint
 
 
-from .models import Cell
+from .models import EmptyCell, RandomCell
 from . import constants as c
 
 
@@ -10,16 +10,18 @@ def init_grid(screen, grid):
     for row in range(c.CELLS_PER_ROW):
         grid.append([])
         for column in range(c.ROWS_PER_SCREEN):
-            grid[row].append(Cell(row, column, grid, starting_state=c.STARTING_STATE))
+            grid[row].append(EmptyCell(row, column, grid))
 
     for i in range(randint(1, 100)):
         add_random_cell_to_grid(grid)
 
 
 def add_random_cell_to_grid(grid):
-    random_cell = grid[randint(0, c.ROWS_PER_SCREEN - 1)][randint(0, c.CELLS_PER_ROW - 1)]
+    row = randint(0, c.ROWS_PER_SCREEN - 1)
+    column = randint(0, c.CELLS_PER_ROW - 1)
+    random_cell = grid[row][column]
     if random_cell.state in [0, 3]:
-        random_cell.update_state(next_state=1)
+        grid[row][column] = RandomCell(row, column, grid)
 
 
 def main_loop(pygame, screen, grid, clock):
