@@ -1,4 +1,5 @@
 import sys
+from random import randint
 
 
 from .models import Cell
@@ -11,7 +12,14 @@ def init_grid(screen, grid):
         for column in range(c.ROWS_PER_SCREEN):
             grid[row].append(Cell(row, column, grid, starting_state=c.STARTING_STATE))
 
-    grid[1][5].update_state(next_state=1)
+    for i in range(randint(1, 100)):
+        add_random_cell_to_grid(grid)
+
+
+def add_random_cell_to_grid(grid):
+    random_cell = grid[randint(0, c.ROWS_PER_SCREEN - 1)][randint(0, c.CELLS_PER_ROW - 1)]
+    if random_cell.state in [0, 3]:
+        random_cell.update_state(next_state=1)
 
 
 def main_loop(pygame, screen, grid, clock):
@@ -22,11 +30,16 @@ def main_loop(pygame, screen, grid, clock):
             if event.type == pygame.QUIT:
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
-                column = pos[0] // (c.CELL_WIDTH + c.CELL_MARGIN)
-                row = pos[1] // (c.CELL_HEIGHT + c.CELL_MARGIN)
-                grid[row][column].next_state = 1
-                print("Click ", pos, "Grid coordinates: ", row, column)
+                add_random_cell_to_grid(grid)
+                current_iteration = 0
+                # pos = pygame.mouse.get_pos()
+                # column = pos[0] // (c.CELL_WIDTH + c.CELL_MARGIN)
+                # row = pos[1] // (c.CELL_HEIGHT + c.CELL_MARGIN)
+                # grid[row][column].next_state = 1
+                # print("Click ", pos, "Grid coordinates: ", row, column)
+
+        if not current_iteration % 10:
+            add_random_cell_to_grid(grid)
 
         screen.fill(c.BLACK)
 
@@ -42,7 +55,10 @@ def main_loop(pygame, screen, grid, clock):
         pygame.display.flip()
         clock.tick(c.SPEED)
         print('--------- TICK {} ----------'.format(current_iteration))
-        print(grid[1][5].rounds_since_state_change)
+        print('oldest generation this round: {}'.format(grid.oldest_gen_this_round))
+        grid.update_oldest_gen_since_start()
+        print('oldest generation since start: {}'.format(grid.oldest_gen_since_start))
+        # print(grid[1][5].rounds_since_state_change)
         # for cell in grid.state_1_cells:
         #     print(str(cell))
 
