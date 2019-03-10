@@ -57,19 +57,13 @@ class Cell():
             if applied:
                 break
 
-    def rule_4(self):
-        if self.rounds_since_state_change > 31:
-            self.next_state = 3
-            return True
-
     def update_state(self, next_state=None):
         if next_state:
             self.next_state = next_state
         if self.next_state is not None:
             self.set_new_state()
-        else:
-            self.rounds_since_state_change += 1
-            self.iterate_color()
+        self.rounds_since_state_change += 1
+        self.iterate_color()
         self.draw()
 
     def set_new_state(self):
@@ -142,6 +136,7 @@ class Cell():
 class EmptyCell(Cell):
     rules = ['rule_1']
     origin_color = Color(255, 255, 255, 255)
+    state = 0
 
     def rule_1(self):
         neighbors = self.get_neighbor_state(count=2, state=1)
@@ -174,8 +169,8 @@ class EmptyCell(Cell):
 
 
 class AlmostEmptyCell(Cell):
-    rules = ['rule_3']
-    origin_color = Color(240, 240, 240, 255)
+    rules = ['rule_reborn']
+    origin_color = Color(15, 15, 15, 255)
     state = 2
     almost_White_decay_rounds = 1
 
@@ -183,10 +178,15 @@ class AlmostEmptyCell(Cell):
         super().__init__(*args, **kwargs)
         self.almost_White_decay_rounds = self.grid.oldest_gen_this_round
 
-    def rule_3(self):
+    def rule_reborn(self):
         if self.rounds_since_state_change > self.almost_White_decay_rounds * 2:
             self.next_state = 0
             return True
+
+    def iterate_color(self):
+        fraction = self.rounds_since_state_change / (self.almost_White_decay_rounds * 2)
+        color_val = 255 * fraction
+        self.color = Color(color_val, color_val, color_val)
 
 
 class RandomCell(Cell):
@@ -204,7 +204,7 @@ class RandomCell(Cell):
         self.color = Color(randint(0, 255), randint(0, 255), randint(0, 255))
 
     def iterate_color(self):
-        starting_int = 0 + (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
+        starting_int = 0 - (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
         min_int = -5 + starting_int
         max_int = 5 + starting_int
         ran_red = randint(min_int, max_int)
@@ -231,7 +231,7 @@ class RandomCell(Cell):
             return True
 
     def rule_2(self):
-        if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:
+        if self.color.r < 15 and self.color.g < 15 and self.color.b < 15:
             self.next_state = 2
             self.gen = 0
             return True
