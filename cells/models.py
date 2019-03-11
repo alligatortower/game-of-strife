@@ -6,13 +6,56 @@ from pygame import Color
 from . import constants as c
 
 
-class Grid(list):
+class GridMaster():
+    cells_per_row = c.DEFAULT_CELLS_PER_ROW
+    rows_per_screen = c.DEFAULT_ROWS_PER_SCREEN
+    cell_width = c.DEFAULT_CELL_WIDTH
+    cell_height = c.DEFAULT_CELL_HEIGHT
+    cell_margin = c.DEFAULT_CELL_MARGIN
+    tick_speed = c.DEFAULT_TICK_SPEED
+
     oldest_gen_since_start = 0
     oldest_gen_this_round = 0
     wrap = True
+    grid = []
 
-    def __init__(self, screen):
-        self.screen = screen
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            if value:
+                setattr(self, key, value)
+
+        for row in range(self.rows_per_screen):
+            self.grid.append([])
+            for column in range(self.cells_per_row):
+                self.grid[row].append(EmptyCell(row, column, self))
+
+        for i in range(randint(1, 100)):
+            self.add_random_cell_to_grid()
+
+    def add_random_cell_to_grid(self):
+        row = randint(0, self.rows_per_screen - 1)
+        column = randint(0, self.cells_per_row - 1)
+        random_cell = self.grid[row][column]
+        if random_cell.state in [0, 3]:
+            self.grid[row][column] = RandomCell(row, column, self)
+
+    def create_screen(self):
+        width = (self.cell_width * self.cells_per_row) + (self.cell_margin * self.cells_per_row) + self.cell_margin
+        height = (self.cell_height * self.rows_per_screen) + (self.cell_margin * self.rows_per_screen) + self.cell_margin
+        self.screen = pygame.display.set_mode((width, height))
+        return self.screen
+
+    def get_next_cell_states(self):
+        self.call_method_on_each_cell('get_next_state')
+
+    def update_cell_states(self):
+        self.call_method_on_each_cell('update_state')
+
+    def call_method_on_each_cell(self, method_name):
+        for row in range(self.rows_per_screen):
+            for column in range(self.cells_per_row):
+                cell = self.grid[row][column]
+                getattr(cell, method_name)()
 
     def update_gen_this_round(self, gen):
         self.oldest_gen_this_round = max(self.oldest_gen_this_round, gen)
@@ -23,9 +66,6 @@ class Grid(list):
 
 
 class Cell():
-    width = c.CELL_WIDTH
-    height = c.CELL_HEIGHT
-    margin = c.CELL_MARGIN
     next_state = None
     rounds_since_state_change = 0
     gen = 0
@@ -39,6 +79,9 @@ class Cell():
         self.row = row
         self.column = column
         self.grid = grid
+        self.width = self.grid.cell_width
+        self.height = self.grid.cell_height
+        self.margin = self.grid.cell_margin
         self.set_color()
 
     def __str__(self):
@@ -75,7 +118,7 @@ class Cell():
         if self.parent_gen is not None:
             next_cell.gen = self.parent_gen + 1
             self.grid.update_gen_this_round(next_cell.gen)
-        self.grid[self.row][self.column] = next_cell
+        self.grid.grid[self.row][self.column] = next_cell
 
     def draw(self):
         pygame.draw.rect(
@@ -100,35 +143,35 @@ class Cell():
 
     def get_neighbor_top(self):
         if self.grid.wrap:
-            row = self.row if self.row != 0 else c.ROWS_PER_SCREEN - 1
-            return self.grid[row - 1][self.column]
+            row = self.row if self.row != 0 else self.grid.rows_per_screen - 1
+            return self.grid.grid[row - 1][self.column]
         elif self.row == 0:
             return None
-        return self.grid[self.row - 1][self.column]
+        return self.grid.grid[self.row - 1][self.column]
 
     def get_neighbor_right(self):
         if self.grid.wrap:
-            column = self.column + 1 if self.column != c.CELLS_PER_ROW - 1 else 0
-            return self.grid[self.row][column]
-        if self.column == c.CELLS_PER_ROW - 1:
+            column = self.column + 1 if self.column != self.grid.cells_per_row - 1 else 0
+            return self.grid.grid[self.row][column]
+        if self.column == self.grid.cells_per_row - 1:
             return None
-        return self.grid[self.row][self.column + 1]
+        return self.grid.grid[self.row][self.column + 1]
 
     def get_neighbor_bottom(self):
         if self.grid.wrap:
-            row = self.row + 1 if self.row != c.ROWS_PER_SCREEN - 1 else 0
-            return self.grid[row][self.column]
-        if self.row == c.ROWS_PER_SCREEN - 1:
+            row = self.row + 1 if self.row != self.grid.rows_per_screen - 1 else 0
+            return self.grid.grid[row][self.column]
+        if self.row == self.grid.rows_per_screen - 1:
             return None
-        return self.grid[self.row + 1][self.column]
+        return self.grid.grid[self.row + 1][self.column]
 
     def get_neighbor_left(self):
         if self.grid.wrap:
-            column = self.column if self.column != 0 else c.CELLS_PER_ROW
-            return self.grid[self.row][column - 1]
+            column = self.column if self.column != 0 else self.grid.cells_per_row
+            return self.grid.grid[self.row][column - 1]
         elif self.column == 0:
             return None
-        return self.grid[self.row][self.column - 1]
+        return self.grid.grid[self.row][self.column - 1]
 
     def get_neighbor_state(self, count=None, directions=None, state=None):
         if not directions:
