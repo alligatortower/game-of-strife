@@ -9,6 +9,7 @@ from . import constants as c
 class Grid(list):
     oldest_gen_since_start = 0
     oldest_gen_this_round = 0
+    wrap = True
 
     def __init__(self, screen):
         self.screen = screen
@@ -42,6 +43,9 @@ class Cell():
 
     def __str__(self):
         return 'cell row-{} column-{}'.format(self.row, self.column)
+
+    def __repr__(self):
+        return self.__str__()
 
     def set_color(self):
         color = self.origin_color
@@ -92,27 +96,37 @@ class Cell():
         self.neighbor_right = self.get_neighbor_right()
         self.neighbor_bottom = self.get_neighbor_bottom()
         self.neighbor_left = self.get_neighbor_left()
-        neighbors = {'top': self.neighbor_top, 'right': self.neighbor_right, 'bottom': self.neighbor_bottom, 'left': self.neighbor_left}
-        self.neighbors = neighbors
-        return
+        self.neighbors = {'top': self.neighbor_top, 'right': self.neighbor_right, 'bottom': self.neighbor_bottom, 'left': self.neighbor_left}
 
     def get_neighbor_top(self):
-        if self.row == 0:
+        if self.grid.wrap:
+            row = self.row if self.row != 0 else c.ROWS_PER_SCREEN - 1
+            return self.grid[row - 1][self.column]
+        elif self.row == 0:
             return None
         return self.grid[self.row - 1][self.column]
 
     def get_neighbor_right(self):
+        if self.grid.wrap:
+            column = self.column + 1 if self.column != c.CELLS_PER_ROW - 1 else 0
+            return self.grid[self.row][column]
         if self.column == c.CELLS_PER_ROW - 1:
             return None
         return self.grid[self.row][self.column + 1]
 
     def get_neighbor_bottom(self):
+        if self.grid.wrap:
+            row = self.row + 1 if self.row != c.ROWS_PER_SCREEN - 1 else 0
+            return self.grid[row][self.column]
         if self.row == c.ROWS_PER_SCREEN - 1:
             return None
         return self.grid[self.row + 1][self.column]
 
     def get_neighbor_left(self):
-        if self.column == 0:
+        if self.grid.wrap:
+            column = self.column if self.column != 0 else c.CELLS_PER_ROW
+            return self.grid[self.row][column - 1]
+        elif self.column == 0:
             return None
         return self.grid[self.row][self.column - 1]
 
@@ -135,7 +149,7 @@ class Cell():
 
 class EmptyCell(Cell):
     rules = ['rule_1']
-    origin_color = Color(255, 255, 255, 255)
+    origin_color = Color(0, 0, 0, 255)
     state = 0
 
     def rule_1(self):
@@ -170,27 +184,35 @@ class EmptyCell(Cell):
 
 class AlmostEmptyCell(Cell):
     rules = ['rule_reborn']
-    origin_color = Color(15, 15, 15, 255)
+    origin_color = Color(240, 240, 240, 255)
     state = 2
-    almost_White_decay_rounds = 1
+    oldest_round_when_created = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.almost_White_decay_rounds = self.grid.oldest_gen_this_round
+        self.oldest_round_when_created = max(self.grid.oldest_gen_this_round, 1)
+
+    @property
+    def decay_rounds(self):
+        return max(self.oldest_round_when_created * 2, 5)
 
     def rule_reborn(self):
-        if self.rounds_since_state_change > self.almost_White_decay_rounds * 2:
+        if self.rounds_since_state_change > self.decay_rounds:
             self.next_state = 0
             return True
 
     def iterate_color(self):
-        fraction = self.rounds_since_state_change / (self.almost_White_decay_rounds * 2)
-        color_val = 255 * fraction
-        self.color = Color(color_val, color_val, color_val)
+        fraction = self.rounds_since_state_change / self.decay_rounds
+        color_val = int(255 * fraction)
+        color_val = 255 - color_val
+        color_val = max(min(color_val, 255), 0)
+        self.color.r = color_val
+        self.color.g = color_val
+        self.color.b = color_val
 
 
 class RandomCell(Cell):
-    decay_rate = 20
+    decay_rate = 24
     color_decay_direction = 1
     parent_color = None
     state = 1
@@ -204,7 +226,7 @@ class RandomCell(Cell):
         self.color = Color(randint(0, 255), randint(0, 255), randint(0, 255))
 
     def iterate_color(self):
-        starting_int = 0 - (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
+        starting_int = 0 + (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
         min_int = -5 + starting_int
         max_int = 5 + starting_int
         ran_red = randint(min_int, max_int)
@@ -231,7 +253,7 @@ class RandomCell(Cell):
             return True
 
     def rule_2(self):
-        if self.color.r < 15 and self.color.g < 15 and self.color.b < 15:
+        if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:
             self.next_state = 2
             self.gen = 0
             return True
