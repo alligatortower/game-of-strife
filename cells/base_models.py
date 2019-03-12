@@ -19,16 +19,19 @@ class MasterGrid():
             if value:
                 setattr(self, key, value)
 
-        self.state_map = [Cell]
-        EmptyCellClass = self.get_empty_cell_class()
+        StartingCellClass = self.get_starting_cell_class()
 
         for row in range(self.rows_per_screen):
             self.grid.append([])
             for column in range(self.cells_per_row):
-                self.grid[row].append(EmptyCellClass(row, column, self))
+                self.grid[row].append(StartingCellClass(row, column, self))
 
-    def get_empty_cell_class(self):
-        return Cell
+    @property
+    def state_map(self):
+        raise NotImplementedError
+
+    def get_starting_cell_class(self):
+        raise NotImplementedError
 
     def create_screen(self):
         width = (self.cell_width * self.cells_per_row) + (self.cell_margin * self.cells_per_row) + self.cell_margin

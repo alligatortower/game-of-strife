@@ -21,18 +21,21 @@ class BloomGrid(MasterGrid):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.state_map = [
-            EmptyCell,
-            RandomCell,
-            AlmostEmptyCell,
-        ]
         for i in range(self.rounds_remembered):
             self.oldest_gen_past_rounds.append(0)
 
         for i in range(randint(1, 100)):
             self.add_random_cell_to_grid()
 
-    def get_empty_cell_class(self):
+    @property
+    def state_map(self):
+        return [
+            EmptyCell,
+            RandomCell,
+            AlmostEmptyCell,
+        ]
+
+    def get_starting_cell_class(self):
         return EmptyCell
 
     def add_random_cell_to_grid(self):
