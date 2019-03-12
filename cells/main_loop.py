@@ -1,12 +1,11 @@
 import sys
 
-from .models import GridMaster
 from . import constants as c
 
 
-def main_loop(pygame, clock, choices):
+def main_loop(pygame, clock, GridClass, choices):
 
-    grid = GridMaster(**choices)
+    grid = GridClass(**choices)
     grid.create_screen()
     current_iteration = 0
 
@@ -14,32 +13,16 @@ def main_loop(pygame, clock, choices):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                grid.add_random_cell_to_grid()
-                current_iteration = 0
-                # pos = pygame.mouse.get_pos()
-                # column = pos[0] // (c.CELL_WIDTH + c.CELL_MARGIN)
-                # row = pos[1] // (c.CELL_HEIGHT + c.CELL_MARGIN)
-                # grid[row][column].next_state = 1
-                # print("Click ", pos, "Grid coordinates: ", row, column)
-
-        if not current_iteration % 10:
-            grid.add_random_cell_to_grid()
+            # elif event.type == pygame.MOUSEBUTTONDOWN:
+            #     grid.add_random_cell_to_grid()
 
         grid.screen.fill(c.BLACK)
-        grid.get_next_cell_states()
-        grid.update_cell_states()
 
+        grid.pre_flip(current_iteration)
         pygame.display.flip()
         clock.tick(grid.tick_speed)
+
         print('--------- TICK {} ----------'.format(current_iteration))
-        print('oldest generation this round: {}'.format(grid.oldest_gen_this_round))
-        grid.update_oldest_gen_since_start()
-        print('oldest generation since start: {}'.format(grid.oldest_gen_since_start))
-        print('oldest gen past rounds:\n{}'.format(grid.oldest_gen_past_rounds))
-        print('average gen past rounds: {}'.format(grid.averaged_oldest_gen_this_round))
-        # print(grid[1][5].rounds_since_state_change)
-        # for cell in grid.state_1_cells:
-        #     print(str(cell))
+        grid.post_flip(current_iteration)
 
         current_iteration += 1
