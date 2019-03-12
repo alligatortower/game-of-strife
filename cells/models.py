@@ -15,7 +15,10 @@ class GridMaster():
     tick_speed = c.DEFAULT_TICK_SPEED
 
     oldest_gen_since_start = 0
+    oldest_gen_past_rounds = []
+    rounds_remembered = 10
     oldest_gen_this_round = 0
+    minimum_decay = 20
     wrap = True
     grid = []
 
@@ -23,6 +26,9 @@ class GridMaster():
         for key, value in kwargs.items():
             if value:
                 setattr(self, key, value)
+
+        for i in range(self.rounds_remembered):
+            self.oldest_gen_past_rounds.append(0)
 
         for row in range(self.rows_per_screen):
             self.grid.append([])
@@ -51,6 +57,13 @@ class GridMaster():
     def update_cell_states(self):
         self.call_method_on_each_cell('update_state')
 
+    @property
+    def averaged_oldest_gen_this_round(self):
+        average = 0
+        for val in self.oldest_gen_past_rounds:
+            average += val
+        return int(average / len(self.oldest_gen_past_rounds))
+
     def call_method_on_each_cell(self, method_name):
         for row in range(self.rows_per_screen):
             for column in range(self.cells_per_row):
@@ -62,6 +75,8 @@ class GridMaster():
 
     def update_oldest_gen_since_start(self):
         self.oldest_gen_since_start = max(self.oldest_gen_since_start, self.oldest_gen_this_round)
+        self.oldest_gen_past_rounds.pop()
+        self.oldest_gen_past_rounds.insert(0, self.oldest_gen_this_round)
         self.oldest_gen_this_round = 0
 
 
@@ -233,14 +248,14 @@ class AlmostEmptyCell(Cell):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.oldest_round_when_created = max(self.grid.oldest_gen_this_round, 1)
+        self.oldest_round_when_created = max(self.grid.averaged_oldest_gen_this_round, 1)
 
     @property
     def decay_rounds(self):
         return max(self.oldest_round_when_created * 2, 5)
 
     def rule_reborn(self):
-        if self.rounds_since_state_change > self.decay_rounds:
+        if self.rounds_since_state_change > max(self.decay_rounds, self.grid.minimum_decay):
             self.next_state = 0
             return True
 
@@ -288,7 +303,7 @@ class RandomCell(Cell):
             return
         choice = randchoice(['top', 'right', 'bottom', 'left'])
         neighbor = self.neighbors[choice]
-        if neighbor and neighbor.state not in [1, 2, 4]:
+        if neighbor and not neighbor.next_state and neighbor.state not in [1, 2]:
             neighbor.parent_color = self.color
             neighbor.parent_gen = self.gen
             neighbor.color_decay_direction = self.color_decay_direction

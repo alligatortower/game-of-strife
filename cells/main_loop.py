@@ -36,6 +36,8 @@ def main_loop(pygame, clock, choices):
         print('oldest generation this round: {}'.format(grid.oldest_gen_this_round))
         grid.update_oldest_gen_since_start()
         print('oldest generation since start: {}'.format(grid.oldest_gen_since_start))
+        print('oldest gen past rounds:\n{}'.format(grid.oldest_gen_past_rounds))
+        print('average gen past rounds: {}'.format(grid.averaged_oldest_gen_this_round))
         # print(grid[1][5].rounds_since_state_change)
         # for cell in grid.state_1_cells:
         #     print(str(cell))
