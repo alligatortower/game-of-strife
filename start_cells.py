@@ -2,12 +2,14 @@ import pygame
 
 from cells.main_loop import main_loop
 from cells.bloom import BloomGrid
+from cells.war import WarGrid
+from cells import constants as c
 
 
 pygame.init()
 clock = pygame.time.Clock()
 
-grid_choices = [BloomGrid, ]
+grid_choices = [BloomGrid, WarGrid]
 DEFAULT_GRID_CHOICE = 0
 
 for index, grid in enumerate(grid_choices):
@@ -30,7 +32,7 @@ while not GridClass:
 
 
 options = {}
-if input('Custom settings? y/N: ') in ['y', 'Y', 'yes', 'Yes', 'YES']:
+if input('Custom settings? y/N: ') in c.AFFIRMATIVE_ANSWERS:
     print('Leave blank for default')
     options = grid.get_options()
 

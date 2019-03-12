@@ -4,7 +4,6 @@ from . import constants as c
 
 
 def main_loop(pygame, clock, GridClass, choices):
-
     grid = GridClass(**choices)
     grid.create_screen()
     current_iteration = 0

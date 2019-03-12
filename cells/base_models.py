@@ -16,7 +16,7 @@ class MasterGrid():
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
-            if value:
+            if value not in [None, '']:
                 setattr(self, key, value)
 
         StartingCellClass = self.get_starting_cell_class()
@@ -61,17 +61,18 @@ class MasterGrid():
     @classmethod
     def get_options(self):
         options = {}
-        options['cells_per_row'] = input('How many cells wide? (Default: {}) -- '.format(c.DEFAULT_CELLS_PER_ROW))
-        options['rows_per_screen'] = input('How many cells high? (Default: {}) -- '.format(c.DEFAULT_ROWS_PER_SCREEN))
-        options['cell_width'] = input('How many pixels wide is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_WIDTH))
-        options['cell_height'] = input('How many pixels high is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_HEIGHT))
-        options['cell_margin'] = input('How many pixels between each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_MARGIN))
-        options['tick_speed'] = input('Tick speed? (Default: {}) -- '.format(c.DEFAULT_TICK_SPEED))
-        for key, value in options.items():
-            if value:
-                options[key] = int(value)
+        if input('Custom grid options? y/N') in c.AFFIRMATIVE_ANSWERS:
+            options['cells_per_row'] = input('How many cells wide? (Default: {}) -- '.format(c.DEFAULT_CELLS_PER_ROW))
+            options['rows_per_screen'] = input('How many cells high? (Default: {}) -- '.format(c.DEFAULT_ROWS_PER_SCREEN))
+            options['cell_width'] = input('How many pixels wide is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_WIDTH))
+            options['cell_height'] = input('How many pixels high is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_HEIGHT))
+            options['cell_margin'] = input('How many pixels between each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_MARGIN))
+            options['tick_speed'] = input('Tick speed? (Default: {}) -- '.format(c.DEFAULT_TICK_SPEED))
+            for key, value in options.items():
+                if value:
+                    options[key] = int(value)
 
-        options['wrap'] = not bool(input('Wrap at edges? (Default: True) "n" for False -- '))
+            options['wrap'] = not bool(input('Wrap at edges? (Default: True) "n" for False -- '))
         return options
 
 
