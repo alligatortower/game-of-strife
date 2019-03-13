@@ -11,7 +11,7 @@ class MasterGrid():
     cell_height = c.DEFAULT_CELL_HEIGHT
     cell_margin = c.DEFAULT_CELL_MARGIN
     tick_speed = c.DEFAULT_TICK_SPEED
-    wrap = True
+    wrap = c.DEFAULT_WRAP_AT_EDGES
     grid = []
 
     def __init__(self, **kwargs):
