@@ -7,10 +7,10 @@ from . import constants as c
 
 DEFAULT_MINIMUM_DECAY = 20
 DEFAULT_CHANCE_FOR_RANDOM = 0
-DEFAULT_AMOUNT_TO_START = 2
-DEFAULT_SURROUND_PROCREATES = 0
+DEFAULT_AMOUNT_TO_START = 20
+DEFAULT_SURROUND_PROCREATES = False
 DEFAULT_CANNOT_BE_KILLED_UNTIL = 0
-DEFAULT_YOUNG_EAT_OLD = 1
+DEFAULT_YOUNG_EAT_OLD = 0  # 0 off, 1 young eat old, 2 old eat young
 
 
 class WarGrid(MasterGrid):
@@ -20,7 +20,7 @@ class WarGrid(MasterGrid):
     oldest_gen_since_start = 0
     oldest_gen_past_rounds = []
     oldest_gen_this_round = 0
-    rounds_remembered = 10
+    rounds_remembered = 50
     family_count = 0
     minimum_decay = DEFAULT_MINIMUM_DECAY
     chance_for_random_ever_x_turns = DEFAULT_CHANCE_FOR_RANDOM

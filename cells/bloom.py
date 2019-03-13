@@ -15,7 +15,7 @@ class BloomGrid(MasterGrid):
     oldest_gen_since_start = 0
     oldest_gen_past_rounds = []
     oldest_gen_this_round = 0
-    rounds_remembered = 10
+    rounds_remembered = 50
     minimum_decay = DEFAULT_MINIMUM_DECAY
     chance_for_random_ever_x_turns = DEFAULT_CHANCE_FOR_RANDOM
 

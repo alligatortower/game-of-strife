@@ -101,7 +101,7 @@ class MasterGrid():
                 },
             ]
         else:
-            options = {}
+            options = []
         return options
 
     @classmethod
