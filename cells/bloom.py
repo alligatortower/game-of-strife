@@ -3,6 +3,7 @@ from random import choice as randchoice
 from pygame import Color
 
 from .base_models import MasterGrid, Cell
+from . import constants as c
 
 DEFAULT_MINIMUM_DECAY = 20
 DEFAULT_CHANCE_FOR_RANDOM = 10
@@ -76,14 +77,25 @@ class BloomGrid(MasterGrid):
     @classmethod
     def get_options(self):
         options = super().get_options()
-        other_options = {}
-        other_options['minimum_decay'] = input('Minimum number of ticks before a dead cell can decay into an empty cell? (Default: {}) -- '.format(DEFAULT_MINIMUM_DECAY))
-        other_options['chance_for_random_ever_x_turns'] = input('Every __ turns, chance for new random cell to appear (Default: {}) -- '.format(DEFAULT_CHANCE_FOR_RANDOM))
+        other_options = [
+            {
+                'key': 'minimum_decay',
+                'question': 'Minimum number of ticks before a dead cell can decay into an empty cell?',
+                'default': DEFAULT_MINIMUM_DECAY
+            },
+            {
+                'key': 'chance_for_random_ever_x_turns',
+                'question': 'Every __ turns, chance for new random cell to appear',
+                'default': DEFAULT_CHANCE_FOR_RANDOM
+            },
+        ]
+        options.extend(other_options)
+        return options
 
-        for key, value in other_options.items():
-            if value:
-                other_options[key] = int(value)
-        options.update(other_options)
+    @classmethod
+    def get_int_options(self):
+        options = MasterGrid().get_int_options()
+        options.extend(['minimum_decay', 'chance_for_random_every_x_turns'])
         return options
 
 
@@ -106,7 +118,7 @@ class EmptyCell(BloomCell):
     state = 0
 
     def rule_1(self):
-        neighbors = self.get_neighbor_state(count=2, state=1)
+        neighbors = self.get_neighbor_state(count=3, state=1)
         if neighbors:
             highest_gen = 0
             reds = []
@@ -159,7 +171,7 @@ class AlmostEmptyCell(BloomCell):
         fraction = self.rounds_since_state_change / self.decay_rounds
         color_val = int(255 * fraction)
         color_val = 255 - color_val
-        color_val = max(min(color_val, 255), 0)
+        color_val = self.normalize_color_val(color_val)
         self.color.r = color_val
         self.color.g = color_val
         self.color.b = color_val
@@ -189,15 +201,15 @@ class RandomCell(BloomCell):
         new_red = self.color.r + ran_red
         new_green = self.color.g + ran_green
         new_blue = self.color.b + ran_blue
-        self.color.r = max(min(new_red, 255), 0)
-        self.color.g = max(min(new_green, 255), 0)
-        self.color.b = max(min(new_blue, 255), 0)
+        self.color.r = self.normalize_color_val(new_red)
+        self.color.g = self.normalize_color_val(new_green)
+        self.color.b = self.normalize_color_val(new_blue)
 
     def rule_0(self):
         skip = randint(0, 2)
         if skip:
             return
-        choice = randchoice(['top', 'right', 'bottom', 'left'])
+        choice = randchoice(c.DIRECTIONS)
         neighbor = self.neighbors[choice]
         if neighbor and not neighbor.next_state and neighbor.state not in [1, 2]:
             neighbor.parent_color = self.color

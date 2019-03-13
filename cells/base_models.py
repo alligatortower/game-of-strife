@@ -24,7 +24,7 @@ class MasterGrid():
         for row in range(self.rows_per_screen):
             self.grid.append([])
             for column in range(self.cells_per_row):
-                self.grid[row].append(StartingCellClass(row, column, self))
+                self.grid[row].append(StartingCellClass(row, column, self, initial_cell=True))
 
     @property
     def state_map(self):
@@ -60,26 +60,64 @@ class MasterGrid():
 
     @classmethod
     def get_options(self):
-        options = {}
-        if input('Custom grid options? y/N') in c.AFFIRMATIVE_ANSWERS:
-            options['cells_per_row'] = input('How many cells wide? (Default: {}) -- '.format(c.DEFAULT_CELLS_PER_ROW))
-            options['rows_per_screen'] = input('How many cells high? (Default: {}) -- '.format(c.DEFAULT_ROWS_PER_SCREEN))
-            options['cell_width'] = input('How many pixels wide is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_WIDTH))
-            options['cell_height'] = input('How many pixels high is each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_HEIGHT))
-            options['cell_margin'] = input('How many pixels between each cell? (Default: {}) -- '.format(c.DEFAULT_CELL_MARGIN))
-            options['tick_speed'] = input('Tick speed? (Default: {}) -- '.format(c.DEFAULT_TICK_SPEED))
-            for key, value in options.items():
-                if value:
-                    options[key] = int(value)
-
-            options['wrap'] = not bool(input('Wrap at edges? (Default: True) "n" for False -- '))
+        print('\n')
+        print('Do you want to customize the shape and appearance?')
+        if input('y/N ---> ') in c.AFFIRMATIVE_ANSWERS:
+            options = [
+                {
+                    'key': 'cells_per_row',
+                    'question': 'How many cells wide?',
+                    'default': c.DEFAULT_CELLS_PER_ROW
+                },
+                {
+                    'key': 'rows_per_screen',
+                    'question': 'How many cells high?',
+                    'default': c.DEFAULT_ROWS_PER_SCREEN
+                },
+                {
+                    'key': 'cell_width',
+                    'question': 'How many pixels wide is each cell?',
+                    'default': c.DEFAULT_CELL_WIDTH
+                },
+                {
+                    'key': 'cell_height',
+                    'question': 'How many pixels high is each cell?',
+                    'default': c.DEFAULT_CELL_HEIGHT
+                },
+                {
+                    'key': 'cell_margin',
+                    'question': 'How many pixels between each cell?',
+                    'default': c.DEFAULT_CELL_MARGIN
+                },
+                {
+                    'key': 'tick_speed',
+                    'question': 'Tick speed?',
+                    'default': c.DEFAULT_TICK_SPEED
+                },
+                {
+                    'key': 'wrap',
+                    'question': 'Wrap at edges?',
+                    'default': c.DEFAULT_WRAP_AT_EDGES
+                },
+            ]
+        else:
+            options = {}
         return options
+
+    @classmethod
+    def get_int_options(self):
+        return ['cells_per_row', 'rows_per_screen', 'cell_width', 'cell_height', 'cell_margin', 'tick_speed']
+
+    @classmethod
+    def get_truthy_options(self):
+        return ['wrap']
 
 
 class Cell():
     next_state = None
     rounds_since_state_change = 0
     state = 0
+    initial_cell = False
 
     def __init__(self, row, column, grid, **kwargs):
         for key, value in kwargs.items():
@@ -91,12 +129,17 @@ class Cell():
         self.height = self.mg.cell_height
         self.margin = self.mg.cell_margin
         self.set_color()
+        if not self.initial_cell:
+            self.introduce_self_to_neighbors()
 
     def __str__(self):
         return 'cell row-{} column-{}'.format(self.row, self.column)
 
     def __repr__(self):
         return self.__str__()
+
+    def normalize_color_val(self, val):
+        return max(min(int(val), 255), 0)
 
     def set_color(self):
         color = self.origin_color
@@ -180,7 +223,7 @@ class Cell():
 
     def get_neighbor_state(self, count=None, directions=None, state=None):
         if not directions:
-            directions = ['top', 'right', 'bottom', 'left']
+            directions = c.DIRECTIONS
 
         matches = []
         for direction in directions:
@@ -193,3 +236,12 @@ class Cell():
         elif len(matches) >= count:
             return matches
         return None
+
+    def introduce_self_to_neighbors(self):
+        self.get_neighbors()
+        for direction in c.DIRECTIONS:
+            self.neighbors[direction].accept_neighbor_introduction(self, direction)
+
+    def accept_neighbor_introduction(self, neighbor, direction):
+        self.get_neighbors()
+        self.neighbors[direction] = neighbor

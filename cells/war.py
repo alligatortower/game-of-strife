@@ -3,10 +3,14 @@ from random import choice as randchoice
 from pygame import Color
 
 from .base_models import MasterGrid, Cell
+from . import constants as c
 
 DEFAULT_MINIMUM_DECAY = 20
 DEFAULT_CHANCE_FOR_RANDOM = 0
 DEFAULT_AMOUNT_TO_START = 2
+DEFAULT_SURROUND_PROCREATES = 0
+DEFAULT_CANNOT_BE_KILLED_UNTIL = 0
+DEFAULT_YOUNG_EAT_OLD = 1
 
 
 class WarGrid(MasterGrid):
@@ -17,10 +21,13 @@ class WarGrid(MasterGrid):
     oldest_gen_past_rounds = []
     oldest_gen_this_round = 0
     rounds_remembered = 10
-    family = 0
+    family_count = 0
     minimum_decay = DEFAULT_MINIMUM_DECAY
     chance_for_random_ever_x_turns = DEFAULT_CHANCE_FOR_RANDOM
     amount_to_start = DEFAULT_AMOUNT_TO_START
+    surround_procreates = DEFAULT_SURROUND_PROCREATES
+    cannot_be_killed_until = DEFAULT_CANNOT_BE_KILLED_UNTIL
+    young_eat_old = DEFAULT_YOUNG_EAT_OLD
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -47,8 +54,7 @@ class WarGrid(MasterGrid):
         column = randint(0, self.cells_per_row - 1)
         random_cell = self.grid[row][column]
         if random_cell.state in [0, 3]:
-            self.grid[row][column] = RandomCell(row, column, self, family=self.family)
-            self.family += 1
+            self.grid[row][column] = RandomCell(row, column, self, family=self.get_next_family())
 
     def update_gen_this_round(self, gen):
         self.oldest_gen_this_round = max(self.oldest_gen_this_round, gen)
@@ -66,6 +72,11 @@ class WarGrid(MasterGrid):
             average += val
         return int(average / len(self.oldest_gen_past_rounds))
 
+    def get_next_family(self):
+        family = self.family_count
+        self.family_count += 1
+        return family
+
     def pre_flip(self, iteration):
         if self.chance_for_random_ever_x_turns != 0 and not (iteration % self.chance_for_random_ever_x_turns):
             self.add_random_cell_to_grid()
@@ -75,21 +86,61 @@ class WarGrid(MasterGrid):
         print('oldest generation this round: {}'.format(self.oldest_gen_this_round))
         self.update_oldest_gen_since_start()
         print('oldest generation since start: {}'.format(self.oldest_gen_since_start))
-        print('oldest gen past rounds:\n{}'.format(self.oldest_gen_past_rounds))
         print('average gen past rounds: {}'.format(self.averaged_oldest_gen_this_round))
+        print('families created: {}'.format(self.family_count))
 
     @classmethod
     def get_options(self):
         options = super().get_options()
-        other_options = {}
-        other_options['minimum_decay'] = input('Minimum number of ticks before a dead cell can decay into an empty cell? (Default: {}) -- '.format(DEFAULT_MINIMUM_DECAY))
-        other_options['chance_for_random_ever_x_turns'] = input('Every __ turns, chance for new random cell to appear (Default: {}) 0 for off -- '.format(DEFAULT_CHANCE_FOR_RANDOM))
-        other_options['amount_to_start'] = input('How many cells to start? (Default: {}) -- '.format(DEFAULT_AMOUNT_TO_START))
+        other_options = [
+            {
+                'key': 'minimum_decay',
+                'question': 'Minimum number of ticks before a dead cell can decay into an empty cell?',
+                'default': DEFAULT_MINIMUM_DECAY
+            },
+            {
+                'key': 'chance_for_random_ever_x_turns',
+                'question': 'Every __ turns chance for new random cell to appear',
+                'default': DEFAULT_CHANCE_FOR_RANDOM
+            },
+            {
+                'key': 'amount_to_start',
+                'question': 'How many cells to start?',
+                'default': DEFAULT_AMOUNT_TO_START
+            },
+            {
+                'key': 'surround_procreates',
+                'question': 'If empty cells are surrounded, they have a chance to spawn a new family?',
+                'default': DEFAULT_SURROUND_PROCREATES
+            },
+            {
+                'key': 'cannot_be_killed_until',
+                'question': 'A cell cannot be killed until it is this many rounds old?',
+                'default': DEFAULT_CANNOT_BE_KILLED_UNTIL
+            },
+            {
+                'key': 'young_eat_old',
+                'question': ['0 --> Do not compare ages.', '1 --> Younger cells win.', '2 --> Older cells win'],
+                'default': DEFAULT_YOUNG_EAT_OLD,
+                'valid_anwers': ['0', '1', '2']
+            },
+        ]
+        options.extend(other_options)
+        return options
 
-        for key, value in other_options.items():
-            if value:
-                other_options[key] = int(value)
-        options.update(other_options)
+    @classmethod
+    def get_int_options(self):
+        options = MasterGrid.get_int_options()
+        options.extend([
+            'minimum_decay', 'chance_for_random_every_x_turns',
+            'amount_to_start', 'cannot_be_killed_until', 'young_eat_old'
+        ])
+        return options
+
+    @classmethod
+    def get_truthy_options(self):
+        options = MasterGrid.get_truthy_options()
+        options.extend(['surround_procreates'])
         return options
 
 
@@ -108,40 +159,47 @@ class BloomCell(Cell):
 
 
 class EmptyCell(BloomCell):
-    rules = ['rule_1']
     origin_color = Color(0, 0, 0, 255)
     state = 0
 
-    def rule_1(self):
-        pass
-        # neighbors = self.get_neighbor_state(count=2, state=1)
-        # if neighbors:
-        #     highest_gen = 0
-        #     reds = []
-        #     greens = []
-        #     blues = []
-        #     red = 0
-        #     green = 0
-        #     blue = 0
+    @property
+    def rules(self):
+        if self.mg.surround_procreates:
+            return ['rule_procreate']
+        return []
 
-        #     for neighbor in neighbors:
-        #         reds.append(neighbor.color.r)
-        #         greens.append(neighbor.color.g)
-        #         blues.append(neighbor.color.b)
-        #         highest_gen = max(highest_gen, neighbor.gen)
+    def rule_procreate(self):
+        neighbors = self.get_neighbor_state(count=4, state=1)
+        if neighbors:
+            if randint(0, 2):
+                return
+            highest_gen = 0
+            reds = []
+            greens = []
+            blues = []
+            red = 0
+            green = 0
+            blue = 0
 
-        #     for value in reds:
-        #         red += value / len(reds)
-        #     for value in greens:
-        #         green += value / len(greens)
-        #     for value in blues:
-        #         blue += value / len(blues)
+            for neighbor in neighbors:
+                reds.append(neighbor.color.r)
+                greens.append(neighbor.color.g)
+                blues.append(neighbor.color.b)
+                highest_gen = max(highest_gen, neighbor.gen)
 
-        #     self.parent_color = Color(int(red), int(green), int(blue))
-        #     self.parent_gen = highest_gen
-        #     self.next_state = 1
-        #     self.booped = True
-        #     return True
+            for value in reds:
+                red += value / len(reds)
+            for value in greens:
+                green += value / len(greens)
+            for value in blues:
+                blue += value / len(blues)
+
+            self.parent_color = Color(int(red), int(green), int(blue))
+            self.parent_gen = highest_gen
+            self.parent_family = self.mg.get_next_family()
+            self.next_state = 1
+            self.booped = True
+            return True
 
 
 class AlmostEmptyCell(BloomCell):
@@ -167,7 +225,7 @@ class AlmostEmptyCell(BloomCell):
         fraction = self.rounds_since_state_change / self.decay_rounds
         color_val = int(255 * fraction)
         color_val = 255 - color_val
-        color_val = max(min(color_val, 255), 0)
+        color_val = self.normalize_color_val(color_val)
         self.color.r = color_val
         self.color.g = color_val
         self.color.b = color_val
@@ -176,9 +234,10 @@ class AlmostEmptyCell(BloomCell):
 class RandomCell(BloomCell):
     decay_rate = 24
     color_decay_direction = 1
+    color_offset = 3
     parent_color = None
     state = 1
-    rules = ['rule_0', 'rule_2']
+    rules = ['rule_eat', 'rule_die']
 
     def set_color(self):
         if self.parent_color:
@@ -189,35 +248,49 @@ class RandomCell(BloomCell):
 
     def iterate_color(self):
         starting_int = 0 + (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
-        min_int = -5 + starting_int
-        max_int = 5 + starting_int
+        min_int = (-1 * self.color_offset) + starting_int
+        max_int = self.color_offset + starting_int
         ran_red = randint(min_int, max_int)
         ran_green = randint(min_int, max_int)
         ran_blue = randint(min_int, max_int)
         new_red = self.color.r + ran_red
         new_green = self.color.g + ran_green
         new_blue = self.color.b + ran_blue
-        self.color.r = max(min(new_red, 255), 0)
-        self.color.g = max(min(new_green, 255), 0)
-        self.color.b = max(min(new_blue, 255), 0)
+        self.color.r = self.normalize_color_val(new_red)
+        self.color.g = self.normalize_color_val(new_green)
+        self.color.b = self.normalize_color_val(new_blue)
 
-    def rule_0(self):
+    def rule_eat(self):
         skip = randint(0, 2)
         if skip:
             return
-        choice = randchoice(['top', 'right', 'bottom', 'left'])
+        choice = randchoice(c.DIRECTIONS)
         neighbor = self.neighbors[choice]
         if neighbor and not neighbor.next_state and neighbor.state not in [2, ]:
-            if neighbor.state == 1 and neighbor.family == self.family:
-                return
+            if neighbor.state == 1:
+                if neighbor.family == self.family:
+                    return
+                elif self.mg.cannot_be_killed_until \
+                        and neighbor.rounds_since_state_change <= self.mg.cannot_be_killed_until:
+                    return
+                elif self.mg.young_eat_old == 1 \
+                        and self.rounds_since_state_change >= neighbor.rounds_since_state_change:
+                    return
+                elif self.mg.young_eat_old == 2 \
+                        and self.rounds_since_state_change <= neighbor.rounds_since_state_change:
+                    return
+
+                self.color.r = self.normalize_color_val(self.color.r + 5)
+                self.color.g = self.normalize_color_val(self.color.g + 5)
+                self.color.b = self.normalize_color_val(self.color.b + 5)
+
             neighbor.parent_family = self.family
             neighbor.parent_color = self.color
             neighbor.parent_gen = self.gen
-            neighbor.color_decay_direction = self.color_decay_direction
             neighbor.update_state(next_state=1)
             return True
 
-    def rule_2(self):
+    def rule_die(self):
         if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:
             self.next_state = 2
             self.gen = 0
