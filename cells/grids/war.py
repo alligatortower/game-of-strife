@@ -194,11 +194,11 @@ class RandomCell(BloomCell):
     type = 1
     rules = ['rule_eat', 'rule_die']
 
-    def set_new_type(self):
-        new_gen = self.hereditary_attrs.get('gen')
+    def __init__(self, row, column, grid, **kwargs):
+        new_gen = kwargs.get('gen')
         if new_gen:
-            self.mg.update_gen_this_round(new_gen)
-        super().set_new_type()
+            grid.update_gen_this_round(new_gen)
+        super().__init__(row, column, grid, **kwargs)
 
     def set_color(self):
         if self.origin_color:
