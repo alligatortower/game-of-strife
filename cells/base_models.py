@@ -38,22 +38,23 @@ class MasterGrid():
     def get_next_cell_types(self):
         self.call_method_on_each_cell('apply_rules')
 
-    def update_cell_types(self):
-        self.call_method_on_each_cell('update_type')
-
-    def draw_all_cells(self):
-        self.call_method_on_each_cell('draw')
+    def update_cell_types_and_draw(self):
+        self.call_method_on_each_cell(['update_type', 'draw'])
 
     def call_method_on_each_cell(self, method_name):
         for row in range(self.rows_per_screen):
             for column in range(self.cells_per_row):
-                cell = self.grid[row][column]
-                getattr(cell, method_name)()
+                if isinstance(method_name, list):
+                    for name in method_name:
+                        cell = self.grid[row][column]
+                        getattr(cell, name)()
+                else:
+                    cell = self.grid[row][column]
+                    getattr(cell, method_name)()
 
     def pre_flip(self, iteration):
         self.get_next_cell_types()
-        self.update_cell_types()
-        self.draw_all_cells()
+        self.update_cell_types_and_draw()
 
     def post_flip(self, iteration):
         pass
