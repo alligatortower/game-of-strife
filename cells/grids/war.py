@@ -40,14 +40,6 @@ class WarGrid(MasterGrid):
         for i in range(self.amount_to_start):
             self.add_random_cell_to_grid()
 
-    @property
-    def state_map(self):
-        return [
-            EmptyCell,
-            RandomCell,
-            AlmostEmptyCell,
-        ]
-
     def get_starting_cell_class(self):
         return EmptyCell
 
@@ -55,7 +47,7 @@ class WarGrid(MasterGrid):
         row = randint(0, self.rows_per_screen - 1)
         column = randint(0, self.cells_per_row - 1)
         random_cell = self.grid[row][column]
-        if random_cell.state in [0, 3]:
+        if random_cell.type in [0, 3]:
             self.grid[row][column] = RandomCell(row, column, self, family=self.get_next_family())
 
     def update_gen_this_round(self, gen):
@@ -148,21 +140,12 @@ class WarGrid(MasterGrid):
 
 class BloomCell(Cell):
     gen = 0
-    parent_gen = None
-    parent_family = None
     almost_White_decay_rounds = 1
-
-    def set_new_state(self):
-        next_cell = self.mg.state_map[self.next_state](self.row, self.column, self.mg, parent_color=self.parent_color, family=self.parent_family)
-        if self.parent_gen is not None:
-            next_cell.gen = self.parent_gen + 1
-            self.mg.update_gen_this_round(next_cell.gen)
-        self.mg.grid[self.row][self.column] = next_cell
 
 
 class EmptyCell(BloomCell):
     origin_color = Color(0, 0, 0, 255)
-    state = 0
+    type = 0
 
     @property
     def rules(self):
@@ -171,7 +154,7 @@ class EmptyCell(BloomCell):
         return []
 
     def rule_procreate(self):
-        neighbors = self.get_neighbor_state(count=4, state=1)
+        neighbors = self.get_neighbor_type(count=4, type=1)
         if neighbors:
             if randint(0, 2):
                 return
@@ -196,60 +179,36 @@ class EmptyCell(BloomCell):
             for value in blues:
                 blue += value / len(blues)
 
-            self.parent_color = Color(int(red), int(green), int(blue))
-            self.parent_gen = highest_gen
-            self.parent_family = self.mg.get_next_family()
-            self.next_state = 1
-            self.booped = True
+            self.hereditary_attrs['origin_color'] = Color(int(red), int(green), int(blue))
+            self.hereditary_attrs['gen'] = highest_gen + 1
+            self.hereditary_attrs['family'] = self.mg.get_next_family()
+            self.next_type = RandomCell
             return True
-
-
-class AlmostEmptyCell(BloomCell):
-    rules = ['rule_reborn']
-    origin_color = Color(240, 240, 240, 255)
-    state = 2
-    oldest_round_when_created = 1
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.oldest_round_when_created = max(self.mg.averaged_oldest_gen_this_round, 1)
-
-    @property
-    def decay_rounds(self):
-        return max(self.oldest_round_when_created * 2, self.mg.minimum_decay)
-
-    def rule_reborn(self):
-        if self.rounds_since_state_change > self.decay_rounds:
-            self.next_state = 0
-            return True
-
-    def iterate_color(self):
-        fraction = self.rounds_since_state_change / self.decay_rounds
-        color_val = int(255 * fraction)
-        color_val = 255 - color_val
-        color_val = self.normalize_color_val(color_val)
-        self.color.r = color_val
-        self.color.g = color_val
-        self.color.b = color_val
 
 
 class RandomCell(BloomCell):
     decay_rate = 24
     color_decay_direction = 1
     color_offset = 3
-    parent_color = None
-    state = 1
+    origin_color = None
+    type = 1
     rules = ['rule_eat', 'rule_die']
 
+    def set_new_type(self):
+        new_gen = self.hereditary_attrs.get('gen')
+        if new_gen:
+            self.mg.update_gen_this_round(new_gen)
+        super().set_new_type()
+
     def set_color(self):
-        if self.parent_color:
-            self.color = Color(self.parent_color.r, self.parent_color.g, self.parent_color.b)
-            self.parent_color = None
+        if self.origin_color:
+            self.color = Color(self.origin_color.r, self.origin_color.g, self.origin_color.b)
+            self.origin_color = None
             return
         self.color = Color(randint(0, 255), randint(0, 255), randint(0, 255))
 
     def iterate_color(self):
-        starting_int = 0 + (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
+        starting_int = 0 + (int((self.rounds_since_type_change / self.decay_rate)) * self.color_decay_direction)
         min_int = (-1 * self.color_offset) + starting_int
         max_int = self.color_offset + starting_int
         ran_red = randint(min_int, max_int)
@@ -265,20 +224,20 @@ class RandomCell(BloomCell):
     def rule_eat(self):
         choice = randchoice(c.DIRECTIONS)
         neighbor = self.neighbors[choice]
-        if neighbor and not neighbor.next_state and neighbor.state not in [2, ]:
-            if neighbor.state == 1:
+        if neighbor and not neighbor.next_type and neighbor.type not in [2, ]:
+            if neighbor.type == 1:
                 if neighbor.family == self.family:
                     return
                 elif self.mg.cannot_be_killed_until \
-                        and neighbor.rounds_since_state_change <= self.mg.cannot_be_killed_until:
+                        and neighbor.rounds_since_type_change <= self.mg.cannot_be_killed_until:
                     return
-                elif self.mg.cannot_kill_after and self.rounds_since_state_change > self.mg.cannot_kill_after:
+                elif self.mg.cannot_kill_after and self.rounds_since_type_change > self.mg.cannot_kill_after:
                     return
                 elif self.mg.young_eat_old == 1 \
-                        and self.rounds_since_state_change >= neighbor.rounds_since_state_change:
+                        and self.rounds_since_type_change >= neighbor.rounds_since_type_change:
                     return
                 elif self.mg.young_eat_old == 2 \
-                        and self.rounds_since_state_change <= neighbor.rounds_since_state_change:
+                        and self.rounds_since_type_change <= neighbor.rounds_since_type_change:
                     return
 
                 self.color.r = self.normalize_color_val(self.color.r + 5)
@@ -289,14 +248,43 @@ class RandomCell(BloomCell):
                 if skip:
                     return
 
-            neighbor.parent_family = self.family
-            neighbor.parent_color = self.color
-            neighbor.parent_gen = self.gen
-            neighbor.update_state(next_state=1)
+            neighbor.hereditary_attrs['family'] = self.family
+            neighbor.hereditary_attrs['origin_color'] = self.color
+            neighbor.hereditary_attrs['gen'] = self.gen + 1
+            neighbor.update_type(next_type=RandomCell)
             return True
 
     def rule_die(self):
         if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:
-            self.next_state = 2
+            self.next_type = DeadCell
             self.gen = 0
             return True
+
+
+class DeadCell(BloomCell):
+    rules = ['rule_reborn']
+    origin_color = Color(240, 240, 240, 255)
+    type = 2
+    oldest_round_when_created = 1
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.oldest_round_when_created = max(self.mg.averaged_oldest_gen_this_round, 1)
+
+    @property
+    def decay_rounds(self):
+        return max(self.oldest_round_when_created * 2, self.mg.minimum_decay)
+
+    def rule_reborn(self):
+        if self.rounds_since_type_change > self.decay_rounds:
+            self.next_type = EmptyCell
+            return True
+
+    def iterate_color(self):
+        fraction = max(self.rounds_since_type_change, 1) / self.decay_rounds
+        color_val = int(255 * fraction)
+        color_val = 255 - color_val
+        color_val = self.normalize_color_val(color_val)
+        self.color.r = color_val
+        self.color.g = color_val
+        self.color.b = color_val

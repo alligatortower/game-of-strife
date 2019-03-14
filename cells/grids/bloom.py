@@ -28,14 +28,6 @@ class BloomGrid(MasterGrid):
         for i in range(randint(1, 100)):
             self.add_random_cell_to_grid()
 
-    @property
-    def state_map(self):
-        return [
-            EmptyCell,
-            RandomCell,
-            AlmostEmptyCell,
-        ]
-
     def get_starting_cell_class(self):
         return EmptyCell
 
@@ -43,7 +35,7 @@ class BloomGrid(MasterGrid):
         row = randint(0, self.rows_per_screen - 1)
         column = randint(0, self.cells_per_row - 1)
         random_cell = self.grid[row][column]
-        if random_cell.state in [0, 3]:
+        if random_cell.type in [0, 3]:
             self.grid[row][column] = RandomCell(row, column, self)
 
     def update_gen_this_round(self, gen):
@@ -101,24 +93,16 @@ class BloomGrid(MasterGrid):
 
 class BloomCell(Cell):
     gen = 0
-    parent_gen = None
     almost_White_decay_rounds = 1
-
-    def set_new_state(self):
-        next_cell = self.mg.state_map[self.next_state](self.row, self.column, self.mg, parent_color=self.parent_color)
-        if self.parent_gen is not None:
-            next_cell.gen = self.parent_gen + 1
-            self.mg.update_gen_this_round(next_cell.gen)
-        self.mg.grid[self.row][self.column] = next_cell
 
 
 class EmptyCell(BloomCell):
     rules = ['rule_1']
     origin_color = Color(0, 0, 0, 255)
-    state = 0
+    type = 0
 
     def rule_1(self):
-        neighbors = self.get_neighbor_state(count=3, state=1)
+        neighbors = self.get_neighbor_type(count=3, type=1)
         if neighbors:
             highest_gen = 0
             reds = []
@@ -141,58 +125,35 @@ class EmptyCell(BloomCell):
             for value in blues:
                 blue += value / len(blues)
 
-            self.parent_color = Color(int(red), int(green), int(blue))
-            self.parent_gen = highest_gen
-            self.next_state = 1
-            self.booped = True
+            self.hereditary_attrs['origin_color'] = Color(int(red), int(green), int(blue))
+            self.hereditary_attrs['gen'] = highest_gen + 1
+            self.next_type = RandomCell
             return True
-
-
-class AlmostEmptyCell(BloomCell):
-    rules = ['rule_reborn']
-    origin_color = Color(240, 240, 240, 255)
-    state = 2
-    oldest_round_when_created = 1
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.oldest_round_when_created = max(self.mg.averaged_oldest_gen_this_round, 1)
-
-    @property
-    def decay_rounds(self):
-        return max(self.oldest_round_when_created * 2, self.mg.minimum_decay)
-
-    def rule_reborn(self):
-        if self.rounds_since_state_change > self.decay_rounds:
-            self.next_state = 0
-            return True
-
-    def iterate_color(self):
-        fraction = self.rounds_since_state_change / self.decay_rounds
-        color_val = int(255 * fraction)
-        color_val = 255 - color_val
-        color_val = self.normalize_color_val(color_val)
-        self.color.r = color_val
-        self.color.g = color_val
-        self.color.b = color_val
 
 
 class RandomCell(BloomCell):
     decay_rate = 24
     color_decay_direction = 1
-    parent_color = None
-    state = 1
+    type = 1
     rules = ['rule_0', 'rule_2']
+    origin_color = None
+    hereditary_attrs = dict()
+
+    def __init__(self, row, column, grid, **kwargs):
+        new_gen = kwargs.get('gen')
+        if new_gen:
+            grid.update_gen_this_round(new_gen)
+        super().__init__(row, column, grid, **kwargs)
 
     def set_color(self):
-        if self.parent_color:
-            self.color = Color(self.parent_color.r, self.parent_color.g, self.parent_color.b)
-            self.parent_color = None
+        if self.origin_color:
+            self.color = Color(self.origin_color.r, self.origin_color.g, self.origin_color.b)
+            self.origin_color = None
             return
         self.color = Color(randint(0, 255), randint(0, 255), randint(0, 255))
 
     def iterate_color(self):
-        starting_int = 0 + (int((self.rounds_since_state_change / self.decay_rate)) * self.color_decay_direction)
+        starting_int = 0 + (int((self.rounds_since_type_change / self.decay_rate)) * self.color_decay_direction)
         min_int = -5 + starting_int
         max_int = 5 + starting_int
         ran_red = randint(min_int, max_int)
@@ -211,15 +172,43 @@ class RandomCell(BloomCell):
             return
         choice = randchoice(c.DIRECTIONS)
         neighbor = self.neighbors[choice]
-        if neighbor and not neighbor.next_state and neighbor.state not in [1, 2]:
-            neighbor.parent_color = self.color
-            neighbor.parent_gen = self.gen
-            neighbor.color_decay_direction = self.color_decay_direction
-            neighbor.update_state(next_state=1)
+        if neighbor and not neighbor.next_type and neighbor.type not in [1, 2]:
+            neighbor.hereditary_attrs['origin_color'] = self.color
+            neighbor.hereditary_attrs['gen'] = self.gen + 1
+            neighbor.update_type(next_type=RandomCell)
             return True
 
     def rule_2(self):
         if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:
-            self.next_state = 2
+            self.next_type = DeadCell
             self.gen = 0
             return True
+
+
+class DeadCell(BloomCell):
+    rules = ['rule_reborn']
+    origin_color = Color(240, 240, 240, 255)
+    type = 2
+    oldest_round_when_created = 1
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.oldest_round_when_created = max(self.mg.averaged_oldest_gen_this_round, 1)
+
+    @property
+    def decay_rounds(self):
+        return max(self.oldest_round_when_created * 2, self.mg.minimum_decay)
+
+    def rule_reborn(self):
+        if self.rounds_since_type_change > self.decay_rounds:
+            self.next_type = EmptyCell
+            return True
+
+    def iterate_color(self):
+        fraction = self.rounds_since_type_change / self.decay_rounds
+        color_val = int(255 * fraction)
+        color_val = 255 - color_val
+        color_val = self.normalize_color_val(color_val)
+        self.color.r = color_val
+        self.color.g = color_val
+        self.color.b = color_val

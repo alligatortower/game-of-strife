@@ -6,21 +6,24 @@ DEFAULT_CUSTOM_OPTION = False
 DEFAULT_ALTERNATIVE_OPTION = 0
 
 
+'''
+Once you're done creating your grid, import your grid into `start_cells.py` and include it in the array passed to Game()
+'''
+
+
 class NewGrid(MasterGrid):
-    # add custom global grid vars
+    # add metadata for users to choose your grid
+    name = 'New Grid'
+    description = 'Choose me! I am the best grid'
+
+    # add custom global grid vars and their defaults
+    custom_option = DEFAULT_CUSTOM_OPTION
+    alternative_option = DEFAULT_ALTERNATIVE_OPTION
 
     def __init__(self, **kwargs):
         # add custom startup logic before grid is set up
         super().__init__(**kwargs)
         # add custom startup logic after grid is set up
-
-    @property
-    def state_map(self):
-        # must return an array of cell classes. The index of each cell is it's state
-        return [
-            CustomCell1,
-            CustomCell2,
-        ]
 
     def get_starting_cell_class(self):
         # must return a cell class. The entire grid will be set as this type of cell to start
@@ -35,6 +38,7 @@ class NewGrid(MasterGrid):
         # generally for printing debug information to the console
         pass
 
+    # include this method if you want custom options for your grid
     @classmethod
     def get_options(self):
         # call super if you want to include the default options for grid / cell size
@@ -78,9 +82,8 @@ class NewCell(Cell):
 
 class CustomCell1(NewCell):
     # subclass all of your actual cells from your base cell
-
-    # its state should match its index in the grids state map
-    state = 0
+    # a cells type is a way for other cells to identiy it
+    type = 0
     # add the color they begin as (if not stay as the whole time)
     origin_color = Color(255, 0, 0, 255)
     # add the rules they follow, this is an array with string versions of methods
@@ -89,12 +92,12 @@ class CustomCell1(NewCell):
 
     def first_rule(self):
         if hasattr(self, 'have_fun'):
-            self.next_state = 1
+            self.next_type = CustomCell2
 
 
 class CustomCell2(NewCell):
     # you can create as many cells as you want
-    state = 1
+    type = 1
     origin_color = Color(0, 255, 0, 255)
     rules = ['other_rule']
 

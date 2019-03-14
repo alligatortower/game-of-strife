@@ -21,7 +21,7 @@ def main_loop(pygame, clock, GridClass, choices):
         pygame.display.flip()
         clock.tick(grid.tick_speed)
 
-        print('--------- TICK {} ----------'.format(current_iteration))
+        print('--------- {}: TICK {} ----------'.format(grid.name, current_iteration))
         grid.post_flip(current_iteration)
 
         current_iteration += 1

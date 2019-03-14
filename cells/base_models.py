@@ -26,10 +26,6 @@ class MasterGrid():
             for column in range(self.cells_per_row):
                 self.grid[row].append(StartingCellClass(row, column, self, initial_cell=True))
 
-    @property
-    def state_map(self):
-        raise NotImplementedError
-
     def get_starting_cell_class(self):
         raise NotImplementedError
 
@@ -39,11 +35,14 @@ class MasterGrid():
         self.screen = pygame.display.set_mode((width, height))
         return self.screen
 
-    def get_next_cell_states(self):
-        self.call_method_on_each_cell('get_next_state')
+    def get_next_cell_types(self):
+        self.call_method_on_each_cell('apply_rules')
 
-    def update_cell_states(self):
-        self.call_method_on_each_cell('update_state')
+    def update_cell_types(self):
+        self.call_method_on_each_cell('update_type')
+
+    def draw_all_cells(self):
+        self.call_method_on_each_cell('draw')
 
     def call_method_on_each_cell(self, method_name):
         for row in range(self.rows_per_screen):
@@ -52,8 +51,9 @@ class MasterGrid():
                 getattr(cell, method_name)()
 
     def pre_flip(self, iteration):
-        self.get_next_cell_states()
-        self.update_cell_states()
+        self.get_next_cell_types()
+        self.update_cell_types()
+        self.draw_all_cells()
 
     def post_flip(self, iteration):
         pass
@@ -114,14 +114,15 @@ class MasterGrid():
 
 
 class Cell():
-    next_state = None
-    rounds_since_state_change = 0
-    state = 0
+    next_type = None
+    rounds_since_type_change = 0
+    type = 0
     initial_cell = False
 
     def __init__(self, row, column, grid, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
+        self.hereditary_attrs = dict()
         self.row = row
         self.column = column
         self.mg = grid
@@ -148,24 +149,24 @@ class Cell():
     def iterate_color(self):
         pass
 
-    def get_next_state(self):
+    def apply_rules(self):
         self.get_neighbors()
         for rule in self.rules:
             applied = getattr(self, rule)()
             if applied:
                 break
 
-    def update_state(self, next_state=None):
-        if next_state is not None:
-            self.next_state = next_state
-        if self.next_state is not None:
-            self.set_new_state()
-        self.rounds_since_state_change += 1
+    def update_type(self, next_type=None):
+        if next_type is not None:
+            self.next_type = next_type
+        if self.next_type is not None:
+            self.set_new_type()
+            return
+        self.rounds_since_type_change += 1
         self.iterate_color()
-        self.draw()
 
-    def set_new_state(self):
-        next_cell = self.mg.state_map[self.next_state](self.row, self.column, self.mg, parent_color=self.parent_color)
+    def set_new_type(self):
+        next_cell = self.next_type(self.row, self.column, self.mg, **self.hereditary_attrs)
         self.mg.grid[self.row][self.column] = next_cell
 
     def draw(self):
@@ -221,14 +222,14 @@ class Cell():
             return None
         return self.mg.grid[self.row][self.column - 1]
 
-    def get_neighbor_state(self, count=None, directions=None, state=None):
+    def get_neighbor_type(self, count=None, directions=None, type=None):
         if not directions:
             directions = c.DIRECTIONS
 
         matches = []
         for direction in directions:
             neighbor = self.neighbors[direction]
-            if neighbor and neighbor.state == state:
+            if neighbor and neighbor.type == type:
                 matches.append(neighbor)
 
         if not count:
