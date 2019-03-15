@@ -193,7 +193,7 @@ class Cell():
 
     def get_neighbor_top(self):
         if self.mg.wrap:
-            row = self.row if self.row != 0 else self.mg.rows_per_screen - 1
+            row = self.row if self.row != 0 else self.mg.rows_per_screen
             return self.mg.grid[row - 1][self.column]
         elif self.row == 0:
             return None
