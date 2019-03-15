@@ -102,7 +102,7 @@ class EmptyCell(BloomCell):
     type = 0
 
     def rule_1(self):
-        neighbors = self.get_neighbor_type(count=3, type=1)
+        neighbors = self.get_neighbor_type(1, count=3)
         if neighbors:
             highest_gen = 0
             reds = []

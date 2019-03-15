@@ -140,8 +140,8 @@ class Cell():
     def __repr__(self):
         return self.__str__()
 
-    def normalize_color_val(self, val):
-        return max(min(int(val), 255), 0)
+    def normalize_color_val(self, val, minimum=0, maximum=255):
+        return max(min(int(val), maximum), minimum)
 
     def set_color(self):
         color = self.origin_color
@@ -223,7 +223,7 @@ class Cell():
             return None
         return self.mg.grid[self.row][self.column - 1]
 
-    def get_neighbor_type(self, count=None, directions=None, type=None):
+    def get_neighbor_type(self, type, count=None, directions=None):
         if not directions:
             directions = c.DIRECTIONS
 

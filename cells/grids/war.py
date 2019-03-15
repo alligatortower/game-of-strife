@@ -7,11 +7,11 @@ from cells import constants as c
 
 DEFAULT_MINIMUM_DECAY = 20
 DEFAULT_CHANCE_FOR_RANDOM = 0
-DEFAULT_AMOUNT_TO_START = 20
+DEFAULT_AMOUNT_TO_START = 2
 DEFAULT_SURROUND_PROCREATES = False
 DEFAULT_CANNOT_BE_KILLED_UNTIL = 0
-DEFAULT_CANNOT_KILL_AFTER = 2
-DEFAULT_YOUNG_EAT_OLD = 0  # 0 off, 1 young eat old, 2 old eat young
+DEFAULT_CANNOT_KILL_AFTER = 0
+DEFAULT_YOUNG_EAT_OLD = 1  # 0 off, 1 young eat old, 2 old eat young
 
 
 class WarGrid(MasterGrid):
@@ -154,7 +154,7 @@ class EmptyCell(BloomCell):
         return []
 
     def rule_procreate(self):
-        neighbors = self.get_neighbor_type(count=4, type=1)
+        neighbors = self.get_neighbor_type(1, count=4)
         if neighbors:
             if randint(0, 2):
                 return
@@ -187,12 +187,12 @@ class EmptyCell(BloomCell):
 
 
 class RandomCell(BloomCell):
-    decay_rate = 24
+    decay_rate = 40
     color_decay_direction = 1
     color_offset = 3
     origin_color = None
     type = 1
-    rules = ['rule_eat', 'rule_die']
+    rules = ['rule_eat', 'rule_social', 'rule_die']
 
     def __init__(self, row, column, grid, **kwargs):
         new_gen = kwargs.get('gen')
@@ -201,9 +201,8 @@ class RandomCell(BloomCell):
         super().__init__(row, column, grid, **kwargs)
 
     def set_color(self):
-        if self.origin_color:
+        if not hasattr(self, 'color') and self.origin_color:
             self.color = Color(self.origin_color.r, self.origin_color.g, self.origin_color.b)
-            self.origin_color = None
             return
         self.color = Color(randint(0, 255), randint(0, 255), randint(0, 255))
 
@@ -221,38 +220,76 @@ class RandomCell(BloomCell):
         self.color.g = self.normalize_color_val(new_green)
         self.color.b = self.normalize_color_val(new_blue)
 
+    def choose_random_neighbor(self, directions=c.DIRECTIONS):
+        choice = randchoice(directions)
+        return self.neighbors[choice]
+
     def rule_eat(self):
-        choice = randchoice(c.DIRECTIONS)
-        neighbor = self.neighbors[choice]
-        if neighbor and not neighbor.next_type and neighbor.type not in [2, ]:
-            if neighbor.type == 1:
-                if neighbor.family == self.family:
-                    return
-                elif self.mg.cannot_be_killed_until \
-                        and neighbor.rounds_since_type_change <= self.mg.cannot_be_killed_until:
-                    return
-                elif self.mg.cannot_kill_after and self.rounds_since_type_change > self.mg.cannot_kill_after:
-                    return
-                elif self.mg.young_eat_old == 1 \
-                        and self.rounds_since_type_change >= neighbor.rounds_since_type_change:
-                    return
-                elif self.mg.young_eat_old == 2 \
-                        and self.rounds_since_type_change <= neighbor.rounds_since_type_change:
-                    return
+        neighbor = self.choose_random_neighbor()
+        if not neighbor or neighbor.next_type:
+            return
+        eat_rules = ['eat_if_blank', 'eat_if_not_family']
+        for rule in eat_rules:
+            eaten = getattr(self, rule)(neighbor)
+            if eaten:
+                break
 
-                self.color.r = self.normalize_color_val(self.color.r + 5)
-                self.color.g = self.normalize_color_val(self.color.g + 5)
-                self.color.b = self.normalize_color_val(self.color.b + 5)
-            else:
-                skip = randint(0, 2)
-                if skip:
-                    return
+    def eat_neighbor(self, neighbor):
+        neighbor.hereditary_attrs['family'] = self.family
+        neighbor.hereditary_attrs['origin_color'] = self.color
+        neighbor.hereditary_attrs['gen'] = self.gen + 1
+        neighbor.update_type(next_type=RandomCell)
 
-            neighbor.hereditary_attrs['family'] = self.family
-            neighbor.hereditary_attrs['origin_color'] = self.color
-            neighbor.hereditary_attrs['gen'] = self.gen + 1
-            neighbor.update_type(next_type=RandomCell)
-            return True
+    def eat_if_blank(self, neighbor):
+        if neighbor.type != 0:
+            return
+        self.eat_neighbor(neighbor)
+        return True
+
+    def eat_if_not_family(self, neighbor):
+        if neighbor.type != 1 or neighbor.family == self.family:
+            return
+        # skip = randint(0, 2)
+        # if skip:
+        #     return
+
+        if self.mg.cannot_be_killed_until != 0 \
+                and neighbor.rounds_since_type_change <= self.mg.cannot_be_killed_until:
+            return
+        elif self.mg.cannot_kill_after != 0 and self.rounds_since_type_change > self.mg.cannot_kill_after:
+            return
+        elif self.mg.young_eat_old == 1 \
+                and self.rounds_since_type_change >= neighbor.rounds_since_type_change:
+            return
+        elif self.mg.young_eat_old == 2 \
+                and self.rounds_since_type_change <= neighbor.rounds_since_type_change:
+            return
+
+        if max(self.color.r, max(self.color.g, self.color.b)) > 200:
+            self.color.r = self.normalize_color_val(self.color.r - 5)
+            self.color.g = self.normalize_color_val(self.color.g - 5)
+            self.color.b = self.normalize_color_val(self.color.b - 5)
+
+        self.eat_neighbor(neighbor)
+        return True
+
+    def rule_social(self):
+        neighbors_4 = self.get_neighbor_type(1, count=4)
+        if neighbors_4:
+            my_family = True
+            for neighbor in neighbors_4:
+                if neighbor.family != self.family:
+                    my_family = False
+            if my_family:
+                self.rounds_since_type_change = 0
+        neighbors_3 = self.get_neighbor_type(1, count=4)
+        if neighbors_3:
+            my_family = True
+            for neighbor in neighbors_3:
+                if neighbor.family != self.family:
+                    my_family = False
+            if my_family:
+                self.rounds_since_type_change -= 1
 
     def rule_die(self):
         if self.color.r > 240 and self.color.g > 240 and self.color.b > 240:

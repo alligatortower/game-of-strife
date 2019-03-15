@@ -56,11 +56,9 @@ class Game():
         print('First, choose your grid. A grid determines all of the rules the cells must abide by')
         print('\n')
         for index, grid in enumerate(self.grid_choices):
-            string = '({}: {}) -- {}'.format(index, grid.name, grid.description)
-            if index == c.DEFAULT_GRID_CHOICE:
-                print('DEFAULT: {}'.format(string))
-            else:
-                print(string)
+            string = '{}: {} -- {}'.format(index, grid.name, grid.description)
+            default_string = 'DEFAULT: ' if index == c.DEFAULT_GRID_CHOICE else '         '
+            print('{}{}'.format(default_string, string))
 
     def customize_grid(self):
         print('Do you want to customize the grid?')
